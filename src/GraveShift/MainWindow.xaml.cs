@@ -7,6 +7,7 @@ using System.Windows.Shapes;
 using System.Windows.Threading;
 using GraveShift.Core;
 using Microsoft.Win32;
+using Path = System.Windows.Shapes.Path;
 
 namespace GraveShift;
 
@@ -51,6 +52,8 @@ public partial class MainWindow : Window
         FindMe.Click += async (_, _) => await AskWindowsForLocation();
         RangeButton.Click += (_, _) => UnlockRange();
 
+        OptionsToggle.Click += (_, _) => ShowOptions(OptionsPanel.Visibility != Visibility.Visible);
+        SizeChanged += (_, _) => KeepOnScreen();
         Graph.SizeChanged += (_, _) => Redraw();
         _engine.Changed += OnEngineChanged;
         Closing += (_, e) => { e.Cancel = true; Hide(); }; // the app lives in the tray; Exit is in the tray menu
@@ -152,43 +155,79 @@ public partial class MainWindow : Window
         _graphDrawn = DateTime.Now;
         var g = Graph;
         g.Children.Clear();
-        double w = g.ActualWidth > 0 ? g.ActualWidth : 532, h = g.Height;
+        double w = g.ActualWidth > 0 ? g.ActualWidth : 532, h = g.Height, baseY = h - 24;
+        GraphFrame.Clip = new RectangleGeometry(new Rect(0, 0, w, h), 12, 12); // keep the curve inside the rounded corners
         var now = DateTime.Now;
-        const int steps = 144; // one bar per 10 minutes across 24 hours
+        var start = now.AddHours(-12);
+
+        // Sample every 5 minutes, then soften the corners where a ramp starts or ends so the curve flows.
+        const int n = 289;
+        var mired = new double[n];
+        for (int i = 0; i < n; i++) mired[i] = 1e6 / Schedule.At(start.AddMinutes(i * 5), S).Kelvin;
+        mired = Smooth(mired, 3.5);
         double maxM = 1e6 / 1200, minM = 1e6 / 6500;
+        double X(int i) => i * w / (n - 1);
+        double Y(int i) => baseY - 12 - (maxM - mired[i]) / (maxM - minM) * (baseY - 34);
 
-        for (int i = 0; i < steps; i++)
-        {
-            var t = now.AddHours(-12).AddMinutes(i * 10);
-            var (k, _) = Schedule.At(t, S);
-            double level = (maxM - 1e6 / k) / (maxM - minM); // 1 = daylight, 0 = deepest ember
-            double barH = 18 + level * (h - 44);
-            var (r, gg, b) = ScreenColor.FromKelvin(k);
-            var bar = new Rectangle
-            {
-                Width = w / steps + 1, Height = barH,
-                Fill = new SolidColorBrush(Color.FromRgb((byte)(r * 255), (byte)(gg * 220), (byte)(b * 200))),
-            };
-            Canvas.SetLeft(bar, i * w / steps);
-            Canvas.SetTop(bar, h - 22 - barH);
-            g.Children.Add(bar);
-        }
-
-        // Hour labels every 6 hours, and the "now" marker in the middle.
+        // Faint guide lines every 6 hours, under the curve.
+        var dim = (Brush)FindResource("Dim");
         for (int i = 0; i <= 24; i++)
         {
-            var t = now.AddHours(-12 + i);
-            if (t.Hour % 6 != 0) continue;
-            double x = (t - now.AddHours(-12)).TotalMinutes / 1440 * w - (t.Minute) / 1440.0 * w;
-            var label = new TextBlock { Text = new DateTime(t.Year, t.Month, t.Day, t.Hour, 0, 0).ToString("t"), FontSize = 11, Foreground = (Brush)FindResource("Dim") };
-            Canvas.SetLeft(label, Math.Clamp(x - 22, 2, w - 56)); Canvas.SetTop(label, h - 18);
+            var hour = new DateTime(start.Year, start.Month, start.Day, start.Hour, 0, 0).AddHours(i);
+            if (hour.Hour % 6 != 0 || hour <= start) continue;
+            double x = (hour - start).TotalMinutes / 1440 * w;
+            if (x > w) break;
+            var guide = new Line { X1 = x, X2 = x, Y1 = 0, Y2 = baseY, Stroke = dim, StrokeThickness = 1, Opacity = 0.15 };
+            g.Children.Add(guide);
+            var label = new TextBlock { Text = hour.ToString("t"), FontSize = 11, Foreground = dim };
+            Canvas.SetLeft(label, Math.Clamp(x - 22, 6, w - 58)); Canvas.SetTop(label, baseY + 5);
             g.Children.Add(label);
         }
-        var line = new Rectangle { Width = 2, Height = h - 22, Fill = Brushes.White, Opacity = 0.9 };
-        Canvas.SetLeft(line, w / 2 - 1);
-        g.Children.Add(line);
-        var nowLabel = new TextBlock { Text = "now", FontSize = 11, Foreground = Brushes.White };
-        Canvas.SetLeft(nowLabel, w / 2 + 5); Canvas.SetTop(nowLabel, 4);
+
+        // Colour runs left to right with the schedule, so the fill is one smooth gradient.
+        var colours = new GradientStopCollection();
+        for (int i = 0; i < n; i += 4)
+        {
+            var (r, gg, b) = ScreenColor.FromKelvin(1e6 / mired[i]);
+            colours.Add(new GradientStop(Color.FromRgb((byte)(r * 255), (byte)(gg * 222), (byte)(b * 205)), (double)i / (n - 1)));
+        }
+        var across = new LinearGradientBrush(colours, new Point(0, 0), new Point(1, 0));
+
+        var area = new StreamGeometry();
+        var edge = new StreamGeometry();
+        using (var c = area.Open())
+        {
+            c.BeginFigure(new Point(0, baseY), true, true);
+            for (int i = 0; i < n; i++) c.LineTo(new Point(X(i), Y(i)), true, true);
+            c.LineTo(new Point(w, baseY), true, true);
+        }
+        using (var c = edge.Open())
+        {
+            c.BeginFigure(new Point(X(0), Y(0)), false, false);
+            for (int i = 1; i < n; i++) c.LineTo(new Point(X(i), Y(i)), true, true);
+        }
+        area.Freeze(); edge.Freeze();
+
+        g.Children.Add(new Path
+        {
+            Data = area, Fill = across,
+            // Bright at the top edge, fading into the panel toward the bottom.
+            OpacityMask = new LinearGradientBrush(Color.FromArgb(235, 0, 0, 0), Color.FromArgb(40, 0, 0, 0), 90),
+        });
+        g.Children.Add(new Path
+        {
+            Data = edge, Stroke = across, StrokeThickness = 2.5, StrokeLineJoin = PenLineJoin.Round,
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 14, ShadowDepth = 0, Color = Colors.White, Opacity = 0.35 },
+        });
+
+        // "Now": a soft line and a dot riding on the curve.
+        int mid = (n - 1) / 2;
+        g.Children.Add(new Line { X1 = w / 2, X2 = w / 2, Y1 = 8, Y2 = baseY, Stroke = Brushes.White, StrokeThickness = 1.2, Opacity = 0.45 });
+        var dot = new Ellipse { Width = 12, Height = 12, Fill = Brushes.White, Stroke = (Brush)FindResource("Bg"), StrokeThickness = 2.5 };
+        Canvas.SetLeft(dot, w / 2 - 6); Canvas.SetTop(dot, Y(mid) - 6);
+        g.Children.Add(dot);
+        var nowLabel = new TextBlock { Text = "now", FontSize = 11, Foreground = Brushes.White, Opacity = 0.85 };
+        Canvas.SetLeft(nowLabel, w / 2 + 6); Canvas.SetTop(nowLabel, 6);
         g.Children.Add(nowLabel);
 
         var (rise, set, up) = Schedule.SunToday(DateOnly.FromDateTime(now), S);
@@ -197,7 +236,39 @@ public partial class MainWindow : Window
             : up ? "Sun up all day" : "Sun down all day";
     }
 
+    /// <summary>Gaussian blur of a series (ends held flat), used only for drawing.</summary>
+    static double[] Smooth(double[] v, double sigma)
+    {
+        int r = (int)Math.Ceiling(sigma * 3);
+        var k = Enumerable.Range(-r, 2 * r + 1).Select(i => Math.Exp(-i * i / (2 * sigma * sigma))).ToArray();
+        double sum = k.Sum();
+        var o = new double[v.Length];
+        for (int i = 0; i < v.Length; i++)
+            for (int j = -r; j <= r; j++) o[i] += v[Math.Clamp(i + j, 0, v.Length - 1)] * k[j + r] / sum;
+        return o;
+    }
+
     // ---- options ----
+
+    public void ShowOptions(bool open)
+    {
+        OptionsPanel.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+        OptionsToggle.Tag = open ? "open" : null;
+        System.Windows.Automation.AutomationProperties.SetName(OptionsToggle, open ? "Hide options" : "Show options");
+    }
+
+    /// <summary>After the window grows (options opened), slide it back inside the screen it's on.</summary>
+    void KeepOnScreen()
+    {
+        if (!IsVisible) return;
+        var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        var area = System.Windows.Forms.Screen.FromHandle(hwnd).WorkingArea;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double right = area.Right / dpi.DpiScaleX, bottom = area.Bottom / dpi.DpiScaleY;
+        double left = area.Left / dpi.DpiScaleX, top = area.Top / dpi.DpiScaleY;
+        if (Left + ActualWidth > right) Left = Math.Max(left, right - ActualWidth);
+        if (Top + ActualHeight > bottom) Top = Math.Max(top, bottom - ActualHeight);
+    }
 
     void SaveTypedLocation()
     {

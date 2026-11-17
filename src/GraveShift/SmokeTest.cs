@@ -62,20 +62,28 @@ static class SmokeTest
             var w = new MainWindow(engine);
             var root = (FrameworkElement)w.Content;
             w.Content = null;
-            root.Measure(new Size(564, double.PositiveInfinity));
-            root.Arrange(new Rect(root.DesiredSize));
-            root.UpdateLayout();
-            w.LoadFromSettings();
-            root.UpdateLayout();
-            var dpi = 1.75;
-            var bmp = new RenderTargetBitmap((int)(root.ActualWidth * dpi), (int)(root.ActualHeight * dpi), 96 * dpi, 96 * dpi, PixelFormats.Pbgra32);
-            bmp.Render(root);
-            var enc = new PngBitmapEncoder();
-            enc.Frames.Add(BitmapFrame.Create(bmp));
-            using var f = File.Create(Path.Combine(Settings.DataDir, "smoke.png"));
-            enc.Save(f);
+            Size Render(string file)
+            {
+                root.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                root.Arrange(new Rect(root.DesiredSize));
+                root.UpdateLayout();
+                w.LoadFromSettings();
+                root.UpdateLayout();
+                var dpi = 1.75;
+                var bmp = new RenderTargetBitmap((int)(root.ActualWidth * dpi), (int)(root.ActualHeight * dpi), 96 * dpi, 96 * dpi, PixelFormats.Pbgra32);
+                bmp.Render(root);
+                var enc = new PngBitmapEncoder();
+                enc.Frames.Add(BitmapFrame.Create(bmp));
+                using var f = File.Create(Path.Combine(Settings.DataDir, file));
+                enc.Save(f);
+                return new Size(root.ActualWidth, root.ActualHeight);
+            }
+            var closed = Render("smoke.png");
+            w.ShowOptions(true);
+            var open = Render("smoke-options.png");
             engine.Stop();
-            Check("window renders", root.ActualHeight > 300, $"{root.ActualWidth:0}x{root.ActualHeight:0}");
+            Check("window renders", closed.Height > 300, $"{closed.Width:0}x{closed.Height:0}");
+            Check("options open to the right", open.Width > closed.Width + 300 && open.Height <= closed.Height + 1, $"{open.Width:0}x{open.Height:0}");
         }
         catch (Exception ex) { Check("window renders", false, ex.ToString()); }
 

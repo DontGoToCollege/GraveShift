@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0 (2026-11-17)
+
+- Options now slide out to the right of the window (click the OPTIONS tab) instead of opening below it,
+  and the window moves itself back on screen if it would run off the edge.
+- The colour graph is now one smooth, glowing curve with a gradient fill, instead of stepped bars.
+
 ## 1.0.1 (2026-11-17)
 
 First public release. Fixes garbled symbols (☀, ☾, ·, −) and the crowded preset/wake-time row in 1.0.0.

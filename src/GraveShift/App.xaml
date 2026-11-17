@@ -1,0 +1,63 @@
+﻿<Application x:Class="GraveShift.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown" ThemeMode="Dark">
+    <Application.Resources>
+        <SolidColorBrush x:Key="Bg" Color="#15121C"/>
+        <SolidColorBrush x:Key="Panel" Color="#1F1B29"/>
+        <SolidColorBrush x:Key="Line" Color="#2E2940"/>
+        <SolidColorBrush x:Key="Text" Color="#ECE6F5"/>
+        <SolidColorBrush x:Key="Dim" Color="#9088A6"/>
+        <SolidColorBrush x:Key="Accent" Color="#FF9A4A"/>
+
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI"/>
+        </Style>
+
+        <Style x:Key="Small" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+            <Setter Property="Foreground" Value="{StaticResource Dim}"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+
+        <!-- Temperature slider: the track shows the colour range, warm on the left. -->
+        <Style x:Key="TempSlider" TargetType="Slider">
+            <Setter Property="Minimum" Value="1200"/>
+            <Setter Property="Maximum" Value="6500"/>
+            <Setter Property="SmallChange" Value="100"/>
+            <Setter Property="LargeChange" Value="500"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+            <Setter Property="Focusable" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid Height="26" Background="Transparent">
+                            <Border Height="8" CornerRadius="4" VerticalAlignment="Center">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Color="#FF5300" Offset="0"/>
+                                        <GradientStop Color="#FF8D2B" Offset="0.15"/>
+                                        <GradientStop Color="#FFB46B" Offset="0.4"/>
+                                        <GradientStop Color="#FFD7AE" Offset="0.7"/>
+                                        <GradientStop Color="#FFFFFF" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Track x:Name="PART_Track">
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Ellipse Width="20" Height="20" Fill="#15121C" Stroke="#ECE6F5" StrokeThickness="3"/>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Application.Resources>
+</Application>

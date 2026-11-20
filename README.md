@@ -41,6 +41,13 @@ If f.lux is also running, quit it first, or the two will fight over your screen.
 Windows normally stops apps from making the screen warmer than about 3400K. If Options says the
 full range is locked, click **Unlock** (Windows asks for permission) and restart the computer.
 
+### Pictures flash white while scrolling
+
+On some computers, pictures briefly lose the warm tint while you scroll fast. Windows moves
+fast-moving content onto a hardware "overlay" that skips the colour change. In Options, click
+**Fix** next to the scrolling note (Windows asks for permission) and restart the computer. This
+turns overlays off for the whole PC; click **Undo** to turn them back on.
+
 ## Building it yourself
 
 You need the .NET 10 SDK. Run `.\publish.ps1` to build `GraveShift.exe`, or

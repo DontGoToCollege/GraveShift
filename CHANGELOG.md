@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1 (2026-11-20)
+
+- New option to stop pictures flashing white while scrolling fast: **Fix** turns off Windows'
+  hardware overlays, which skip the warm tint (needs a restart; **Undo** turns them back on).
+
 ## 1.1.0 (2026-11-17)
 
 - Options now slide out to the right of the window (click the OPTIONS tab) instead of opening below it,

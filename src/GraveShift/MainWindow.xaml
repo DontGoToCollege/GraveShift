@@ -144,6 +144,11 @@
                     <TextBlock x:Name="RangeInfo" TextWrapping="Wrap" Margin="0,14,0,0"/>
                     <Button x:Name="RangeButton" Content="Unlock" Margin="0,6,0,0" HorizontalAlignment="Left" Visibility="Collapsed"/>
 
+                    <DockPanel Margin="0,14,0,0">
+                        <Button x:Name="OverlayButton" DockPanel.Dock="Right" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="OverlayInfo" TextWrapping="Wrap"/>
+                    </DockPanel>
+
                     <TextBlock Text="Hotkeys" FontWeight="SemiBold" Margin="0,16,0,0"/>
                     <TextBlock Style="{StaticResource Small}" Margin="0,4,0,0" LineHeight="18" TextWrapping="Wrap"
                                Text="Alt+End  turn off for an hour, or back on&#10;Alt+PgUp / PgDn  brighter / dimmer&#10;Alt+Shift+PgUp / PgDn  cooler / warmer until the next change"/>

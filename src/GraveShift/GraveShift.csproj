@@ -13,7 +13,7 @@
     <ApplicationIcon>Assets\GraveShift.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <LangVersion>latest</LangVersion>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
     <Authors>DontGoToCollege</Authors>
     <Product>GraveShift</Product>
     <Description>Warms your screen at night, offline</Description>

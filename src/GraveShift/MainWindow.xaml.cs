@@ -51,6 +51,7 @@ public partial class MainWindow : Window
         SaveLocation.Click += (_, _) => SaveTypedLocation();
         FindMe.Click += async (_, _) => await AskWindowsForLocation();
         RangeButton.Click += (_, _) => UnlockRange();
+        OverlayButton.Click += (_, _) => ToggleOverlays();
 
         OptionsToggle.Click += (_, _) => ShowOptions(OptionsPanel.Visibility != Visibility.Visible);
         SizeChanged += (_, _) => KeepOnScreen();
@@ -77,6 +78,7 @@ public partial class MainWindow : Window
         LonBox.Text = S.Longitude?.ToString("0.###", CultureInfo.InvariantCulture) ?? "";
         UpdateValueLabels();
         UpdateRangeInfo();
+        UpdateOverlayInfo();
         _loading = false;
         Redraw();
     }
@@ -326,15 +328,47 @@ public partial class MainWindow : Window
 
     void UnlockRange()
     {
+        RegAsAdmin($"add \"HKLM\\{IcmKey}\" /v GdiIcmGammaRange /t REG_DWORD /d 256 /f");
+        UpdateRangeInfo();
+        if (RangeUnlocked()) RangeInfo.Text = "Unlocked. Restart Windows to finish.";
+    }
+
+    /// <summary>Runs reg.exe behind Windows' admin prompt; does nothing if the user says no.</summary>
+    static void RegAsAdmin(string args)
+    {
         try
         {
-            var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("reg.exe",
-                $"add \"HKLM\\{IcmKey}\" /v GdiIcmGammaRange /t REG_DWORD /d 256 /f") { UseShellExecute = true, Verb = "runas", WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden });
+            var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("reg.exe", args)
+                { UseShellExecute = true, Verb = "runas", WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden });
             p?.WaitForExit();
         }
         catch (Win32Exception) { /* the user said no to the admin prompt */ }
-        UpdateRangeInfo();
-        if (RangeUnlocked()) RangeInfo.Text = "Unlocked. Restart Windows to finish.";
+    }
+
+    // Hardware overlays let fast-scrolling content skip the gamma ramp, so it flashes untinted. 5 turns them off.
+    const string DwmKey = @"SOFTWARE\Microsoft\Windows\Dwm";
+
+    static bool OverlaysOff()
+    {
+        using var k = Registry.LocalMachine.OpenSubKey(DwmKey);
+        return k?.GetValue("OverlayTestMode") is int v && v == 5;
+    }
+
+    void UpdateOverlayInfo()
+    {
+        bool off = OverlaysOff();
+        OverlayInfo.Text = off ? "Scrolling fix is on: fast-moving pictures stay tinted."
+                               : "Pictures flash white when scrolling fast? This turns off Windows' hardware overlays (needs a restart).";
+        OverlayButton.Content = off ? "Undo" : "Fix";
+    }
+
+    void ToggleOverlays()
+    {
+        bool wasOff = OverlaysOff();
+        RegAsAdmin(wasOff ? $"delete \"HKLM\\{DwmKey}\" /v OverlayTestMode /f"
+                          : $"add \"HKLM\\{DwmKey}\" /v OverlayTestMode /t REG_DWORD /d 5 /f");
+        UpdateOverlayInfo();
+        if (OverlaysOff() != wasOff) OverlayInfo.Text = (wasOff ? "Undone." : "Fixed.") + " Restart Windows to finish.";
     }
 
     // ---- text ----

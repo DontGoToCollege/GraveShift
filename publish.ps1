@@ -13,7 +13,12 @@ $archive = Join-Path $root "Versions\Archive\GraveShift-$version.exe"
 if (-not $Test -and (Test-Path $archive)) { throw "Version $version is already archived. Raise <Version> in the csproj, then publish again." }
 
 # A running copy from this folder locks the exe; it restores normal screen colours when it exits.
-if (-not $Test) { Get-Process GraveShift -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$root*" } | Stop-Process -Force }
+$wasRunning = $false
+if (-not $Test) {
+    $running = Get-Process GraveShift -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$root*" }
+    $wasRunning = [bool]$running
+    $running | Stop-Process -Force
+}
 
 Write-Host "Publishing GraveShift $version..." -ForegroundColor Cyan
 dotnet publish $proj -c Release -o $out
@@ -25,5 +30,10 @@ if (-not $Test) {
     New-Item -ItemType Directory -Force (Split-Path $archive) | Out-Null
     Copy-Item $exe $archive
     Copy-Item $exe (Join-Path $root "GraveShift.exe")
+    # Restart the owner's copy (dist, the one Windows startup runs) through WMI so it outlives this script.
+    if ($wasRunning) {
+        Invoke-CimMethod Win32_Process -MethodName Create -Arguments @{ CommandLine = "`"$exe`" --tray"; CurrentDirectory = $out } | Out-Null
+        Write-Host "Restarted GraveShift $version in the tray." -ForegroundColor Green
+    }
 }
 Write-Host "Done: $exe ($([math]::Round((Get-Item $exe).Length / 1MB, 1)) MB)" -ForegroundColor Green
